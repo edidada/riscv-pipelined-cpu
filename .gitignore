@@ -1,0 +1,25 @@
+# Simulation / build products
+build/
+*.vvp
+*.vcd
+dump.vcd
+
+# Generated programs and reference traces (created by tools/)
+prog.hex
+data.hex
+symbols.txt
+ref.trace
+ref.data
+ref.regs
+ref.steps
+inc_*/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

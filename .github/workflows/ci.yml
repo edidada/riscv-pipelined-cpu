@@ -1,0 +1,130 @@
+name: Verilog CPU CI
+
+# Build + simulate the same 7 assembly programs x 4 hazard configurations
+# on all three major operating systems. No local compilation is needed:
+# Icarus Verilog is installed inside each runner.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    name: ${{ matrix.os }} / py${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ['3.11']
+        include:
+          # Also exercise a second Python version on Linux.
+          - os: ubuntu-latest
+            python: '3.13'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # ---------- Icarus Verilog installation, per OS ----------
+      - name: Install Icarus Verilog (Ubuntu)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends iverilog
+          iverilog -V | head -3
+
+      - name: Install Icarus Verilog (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install icarus-verilog
+          iverilog -V | head -3
+
+      - name: Install Icarus Verilog (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Chocolatey is preinstalled on GitHub-hosted Windows runners.
+          # Add its bin dir and the Icarus install dir to PATH for this
+          # step AND subsequent steps via $GITHUB_PATH.
+          choco install iverilog -y --no-progress
+          $candidates = @(
+            "$env:ChocolateyInstall\bin",
+            "$env:ProgramFiles\iverilog\bin",
+            "${env:ProgramFiles(x86)}\iverilog\bin",
+            "C:\iverilog\bin"
+          )
+          foreach ($d in $candidates) {
+            if (Test-Path (Join-Path $d 'iverilog.exe')) {
+              Write-Host "Found iverilog in $d"
+              $d | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          }
+          $exe = Get-Command iverilog.exe -ErrorAction Stop
+          Write-Host "iverilog: $($exe.Source)"
+          iverilog -V | Select-Object -First 3
+
+      - name: Show toolchain versions
+        shell: bash
+        run: |
+          python --version
+          iverilog -V 2>&1 | head -3
+          vvp -V 2>&1 | head -3 || true
+
+      # ---------- Syntax / elaboration check with warnings enabled ----------
+      - name: Elaborate RTL
+        shell: bash
+        run: |
+          mkdir -p build
+          iverilog -g2012 -Wall -I rtl -I tb -o build/elab.vvp \
+            rtl/defs.vh rtl/*.v tb/cpu_tb.v 2>&1 | tee build/elab.log
+          test -s build/elab.vvp
+
+      # ---------- Full simulation matrix ----------
+      # bash is available on all three GitHub-hosted runners. Using it
+      # uniformly keeps the same commands (and the same `python -I`) on
+      # Windows too.
+      - name: Run simulation matrix (7 programs x 4 configurations)
+        shell: bash
+        run: |
+          set -o pipefail
+          python -I tools/run_tests.py --workdir build/sim 2>&1 | tee build/sim.log
+
+      - name: Publish CPI summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f build/sim/summary.md ]; then
+            cat build/sim/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # ---------- Artifacts ----------
+      - name: Collect logs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/artifacts
+          cp build/elab.log build/sim.log build/artifacts/ 2>/dev/null || true
+          cp build/sim/summary.md build/artifacts/ 2>/dev/null || true
+          find build/sim -name '*.vvp' -delete 2>/dev/null || true
+          cp -r build/sim/. build/artifacts/ 2>/dev/null || true
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sim-${{ matrix.os }}-py${{ matrix.python }}
+          path: build/artifacts
+          if-no-files-found: warn
+          retention-days: 7
