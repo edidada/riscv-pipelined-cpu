@@ -217,6 +217,42 @@ def ex2(work, iverilog, vvp):
 
 
 # ---------------------------------------------------------------------------
+# Exercise 3
+# ---------------------------------------------------------------------------
+@exercise(3)
+def ex3(work, iverilog, vvp):
+    print('=== Exercise 3: load_use_adj / no_hazard -> load ADDRESS forwarded ===')
+    log = build(os.path.join(work, 'ex3'), 'load_use_adj', 'no_hazard',
+                iverilog, vvp)
+    vals = err_values(log)
+    # lw x1,0(x2) is at PC=0x04; the immediately following
+    # `addi x3,x1,1` is at PC=0x08. With no stall, EX/MEM can only
+    # supply the load's ADDRESS (0x4000), so x3 becomes 0x4001 instead
+    # of the loaded word 0x2a + 1 = 0x2b.
+    bad = [v for v in vals if v[0] == '00000008' and
+           v[1] == '00004001' and v[2] == '0000002b']
+    traces = traces_of(log)
+    no_stall = bool(traces) and all('stall=0' in l for l in traces)
+    # Find the cycle where the address is actually on the ALU input.
+    addr_fwd = [l for l in traces if 'opA=00004000' in l]
+    print(f'  result: {result_line(log)}')
+    print(f'  cycles traced: {len(traces)}, no stall inserted: {no_stall}')
+    print(f'  cycles with 0x4000 (load address) on ALU input A: {len(addr_fwd)}')
+    if bad:
+        print(f'  corrupted result: {bad[0][3].strip()}')
+    if addr_fwd:
+        print(f'  address on opA: {addr_fwd[0].strip()}')
+    return [
+        ('addi x3,x1,1 at PC=0x08 got 0x4001 (address+1) instead of 0x2b',
+         bool(bad), bad[0][3] if bad else
+         '\n'.join(v[3] for v in vals[:4])),
+        ('no load-use stall was inserted', no_stall, ''),
+        ('the load ADDRESS 0x4000 really appears on an ALU input',
+         bool(addr_fwd), addr_fwd[0] if addr_fwd else ''),
+    ], f'x3=0x4001 instead of 0x2b; {len(addr_fwd)} cycles forwarding 0x4000'
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():
