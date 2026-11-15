@@ -171,7 +171,12 @@ vvp sim.vvp +DUMP          # +DUMP 生成 dump.vcd，可用 gtkwave 看波形
 | `macos-latest` | `brew install icarus-verilog` |
 | `windows-latest` | `choco install iverilog` |
 
-每个 job 都会：elaborate RTL（`-Wall`）→ 跑 28 组仿真 → 上传生成的程序/trace/配置头文件作为 artifact。Windows 上的 iverilog 是 Chocolatey 的 11.0，Linux/macOS 通常是 12.x，两边都要能过，所以 testbench 用 `config.vh` 宏而不是 `-P` 参数覆盖（各版本 `-P` 语法不一致）。
+每个 job 都会：elaborate RTL（`-Wall`）→ 跑 28 组仿真 → 上传生成的程序/trace/配置头文件作为 artifact。
+
+三个平台拿到的 Icarus 版本并不一样（Windows/Chocolatey 是 11.0，Ubuntu/apt 是 12.x，macOS/Homebrew 是 13.0），所以做了两处兼容：
+
+* testbench 用 `config.vh` 宏而不是 `-P` 参数覆盖（各版本 `-P` 语法不一致）；
+* **所有流水线寄存器都在模块顶部、首次使用之前声明**。Icarus 13 对连续赋值的"声明后使用"检查更严格，早期把 EX/MEM 寄存器写在靠近更新逻辑处能过 11/12，但会在 13 上直接 elaboration 失败。这个坑本身就是三平台 CI 抓到的。
 
 ```bash
 gh run list --repo <owner>/<repo>

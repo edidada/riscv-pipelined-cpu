@@ -64,9 +64,27 @@ module cpu #(
 );
 
     // =======================================================================
-    // WB-stage signals (declared early: the EX forwarding mux refers to
-    // wb_result, which combinational Verilog resolves regardless of order)
+    // Pipeline-register state, ALL declared before first use.
+    //
+    // Icarus Verilog 13 (Homebrew on macOS) enforces declaration-before-use
+    // for continuous-assignment elaboration; 11/12 (apt / Chocolatey) did
+    // not. The WB/forwarding muxes below read EX/MEM fields, so those
+    // registers live here at the top of the module rather than next to the
+    // always block that updates them.
     // =======================================================================
+    reg  [31:0] ex_mem_pc_r, ex_mem_instr_r;
+    reg  [31:0] ex_mem_alu_result_r, ex_mem_store_data_r;
+    reg  [4:0]  ex_mem_rd_r;
+    reg  [1:0]  ex_mem_wb_sel_r;
+    reg         ex_mem_reg_write_r, ex_mem_mem_read_r, ex_mem_mem_write_r;
+    reg  [2:0]  ex_mem_mem_width_r;
+    reg         ex_mem_mem_unsigned_r;
+    reg         ex_mem_illegal_r;
+
+    // Data-memory read output is produced by the memory instance further
+    // down, but the WB mux above references it, so declare it here too.
+    wire [31:0] mem_rdata;
+
     reg  [31:0] mem_wb_instr_r;
     reg  [31:0] mem_wb_pc_r;
     reg  [31:0] mem_wb_result_r;   // the value this instruction WILL write
@@ -294,17 +312,8 @@ module cpu #(
     end
 
     // =======================================================================
-    // EX/MEM pipeline register
+    // EX/MEM pipeline register (state declared at the top of the module)
     // =======================================================================
-    reg  [31:0] ex_mem_pc_r, ex_mem_instr_r;
-    reg  [31:0] ex_mem_alu_result_r, ex_mem_store_data_r;
-    reg  [4:0]  ex_mem_rd_r;
-    reg  [1:0]  ex_mem_wb_sel_r;
-    reg         ex_mem_reg_write_r, ex_mem_mem_read_r, ex_mem_mem_write_r;
-    reg  [2:0]  ex_mem_mem_width_r;
-    reg         ex_mem_mem_unsigned_r;
-    reg         ex_mem_illegal_r;
-
     assign ex_mem_instr = ex_mem_instr_r;
 
     // =======================================================================
@@ -518,7 +527,6 @@ module cpu #(
     // =======================================================================
     // MEM stage - data memory
     // =======================================================================
-    wire [31:0] mem_rdata;
     wire        mem_misaligned;
 
     memory #(
