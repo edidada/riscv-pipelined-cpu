@@ -101,12 +101,26 @@ jobs:
           set -o pipefail
           python -I tools/run_tests.py --workdir build/sim 2>&1 | tee build/sim.log
 
+      # ---------- README section 6 hands-on exercises ----------
+      - name: Reproduce hands-on exercises
+        shell: bash
+        run: |
+          set -o pipefail
+          python -I tools/exercises.py --workdir build/exercises 2>&1 \
+            | tee build/exercises.log
+
       - name: Publish CPI summary
         if: always()
         shell: bash
         run: |
           if [ -f build/sim/summary.md ]; then
             cat build/sim/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f build/exercises.log ]; then
+            printf '\n## Hands-on exercises (README section 6)\n\n```\n' \
+              >> "$GITHUB_STEP_SUMMARY"
+            cat build/exercises.log >> "$GITHUB_STEP_SUMMARY"
+            printf '\n```\n' >> "$GITHUB_STEP_SUMMARY"
           fi
 
       # ---------- Artifacts ----------
@@ -115,7 +129,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/artifacts
-          cp build/elab.log build/sim.log build/artifacts/ 2>/dev/null || true
+          cp build/elab.log build/sim.log build/exercises.log \
+            build/artifacts/ 2>/dev/null || true
           cp build/sim/summary.md build/artifacts/ 2>/dev/null || true
           find build/sim -name '*.vvp' -delete 2>/dev/null || true
           cp -r build/sim/. build/artifacts/ 2>/dev/null || true

@@ -192,6 +192,31 @@ def ex1(work, iverilog, vvp):
 
 
 # ---------------------------------------------------------------------------
+# Exercise 2
+# ---------------------------------------------------------------------------
+@exercise(2)
+def ex2(work, iverilog, vvp):
+    print('=== Exercise 2: no_forward -> stale register file (x2 = 0) ===')
+    log = build(os.path.join(work, 'ex2'), 'alu_hazard', 'no_forward',
+                iverilog, vvp)
+    vals = err_values(log)
+    stale = [v for v in vals if v[0] == '00000004' and
+             v[1] == '00000000' and v[2] == '00000002']
+    toks = list(fwd_tokens(log))
+    all_zero = bool(toks) and all(a == '00' and b == '00' for a, b in toks)
+    print(f'  result: {result_line(log)}')
+    print(f'  cycles traced: {len(toks)}, all fwd=00: {all_zero}')
+    if stale:
+        print(f'  first stale read: {stale[0][3].strip()}')
+    return [
+        ('add x2,x1,x1 at PC=0x04 got 0 instead of 2 (stale regfile)',
+         bool(stale), stale[0][3] if stale else
+         '\n'.join(v[3] for v in vals[:4])),
+        ('forward_a/forward_b are 00 in every cycle', all_zero, ''),
+    ], f'x2=0 instead of 2; {len(toks)} cycles with no forwarding'
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():
