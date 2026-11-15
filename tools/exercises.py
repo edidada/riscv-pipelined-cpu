@@ -253,6 +253,34 @@ def ex3(work, iverilog, vvp):
 
 
 # ---------------------------------------------------------------------------
+# Exercise 4
+# ---------------------------------------------------------------------------
+@exercise(4)
+def ex4(work, iverilog, vvp):
+    print('=== Exercise 4: over-stall (drop id_ex_mem_read) ===')
+    base = build(os.path.join(work, 'ex4_base'), 'load_use_adj', 'full',
+                 iverilog, vvp)
+    over = build(os.path.join(work, 'ex4_over'), 'load_use_adj', 'full',
+                 iverilog, vvp,
+                 rtl_override=os.path.join(EXPERIMENTS, 'over_stall'))
+    base_stalls = int_field(result_line(base), 'stalls')
+    over_stalls = int_field(result_line(over), 'stalls')
+    base_cpi, over_cpi = cpi_of(base), cpi_of(over)
+    base_ok = 'PASS cfg=' in base
+    over_ok = 'PASS cfg=' in over
+    print(f'  unmodified : stalls={base_stalls} CPI={base_cpi:.4f} PASS={base_ok}')
+    print(f'  over-stall : stalls={over_stalls} CPI={over_cpi:.4f} PASS={over_ok}')
+    print(f'  base result: {result_line(base)}')
+    print(f'  over result: {result_line(over)}')
+    return [
+        ('over-stall still produces CORRECT results', over_ok, ''),
+        ('but inserts MORE stalls', over_stalls > base_stalls, ''),
+        ('and has a WORSE CPI', over_cpi > base_cpi, ''),
+    ], (f'stalls {base_stalls} -> {over_stalls}, '
+        f'CPI {base_cpi:.4f} -> {over_cpi:.4f}, results still correct')
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():
