@@ -179,18 +179,23 @@ module cpu_tb;
     // reproducible from a plain CI log: no gtkwave needed to see WHY a
     // hazard is being forwarded, stalled or flushed.
     reg trace_on = 0;
+    integer trace_cycle = 0;
     initial begin
         if ($test$plusargs("TRACE")) trace_on = 1;
     end
 
-    always @(posedge clk) begin
+    // Use a DEDICATED counter, not `cycle`: the statistics block below
+    // also runs at posedge, so reading `cycle` here is a race. Print at
+    // negedge instead, when all posedge-updated state has settled.
+    always @(negedge clk) begin
         if (!reset && !finished && trace_on) begin
+            trace_cycle = trace_cycle + 1;
             // Icarus 11 does not accept adjacent string literals here;
             // use explicit concatenation so all three OS versions agree.
             $display({"TRACE c=%0d pc=%h IFID=%h[%h] IDEX=%h EXMEM=%h MEMWB=%h ",
                       "fwd=%b%b store=%b stall=%b lu=%b flush=%b%b ",
                       "opA=%h opB=%h alu=%h memrd=%h wb=%h"},
-                     cycle, pc, if_id_instr, if_id_pc, id_ex_instr,
+                     trace_cycle, pc, if_id_instr, if_id_pc, id_ex_instr,
                      ex_mem_instr, mem_wb_instr,
                      dut.forward_a, dut.forward_b, dut.fwd_store,
                      stall_now, load_use_hazard, flush_if_id, flush_id_ex,

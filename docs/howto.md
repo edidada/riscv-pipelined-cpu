@@ -92,7 +92,20 @@ vvp nf.vvp
 ```bash
 vvp sim.vvp +DUMP        # 生成 dump.vcd
 gtkwave dump.vcd
+
+vvp sim.vvp +TRACE       # 直接把每拍流水线状态打到 stdout，不用装 gtkwave
+python -I /path/to/tools/exercises.py   # README §6 的 5 个实验，逐条核对结论
 ```
+
+`+TRACE` 输出格式（`tb/cpu_tb.v`）：
+
+```
+TRACE c=<拍> pc=<PC> IFID=<指令>[<该指令PC>] IDEX=... EXMEM=... MEMWB=...
+      fwd=<a><b> store=<fwd_store> stall=<0/1> lu=<0/1> flush=<if_id><id_ex>
+      opA=<旁路后ALU输入A> opB=<B> alu=<结果> memrd=<load数据> wb=<写回值>
+```
+
+其中 `fwd` 是 4 个字符（`forward_a` 2 位 + `forward_b` 2 位），例如 `0101` 表示两个操作数都从 EX/MEM 旁路。`tools/exercises.py` 就是解析这行输出来核对 README §6 每条断言的，不需要图形界面。
 
 建议加入的信号（都在 `cpu_tb` / `cpu_tb.dut` 下）：
 

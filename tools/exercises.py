@@ -281,6 +281,60 @@ def ex4(work, iverilog, vvp):
 
 
 # ---------------------------------------------------------------------------
+# Exercise 5
+# ---------------------------------------------------------------------------
+@exercise(5)
+def ex5(work, iverilog, vvp):
+    print('=== Exercise 5: branch flush count (branch.s with far jal) ===')
+    log = build(os.path.join(work, 'ex5'), 'branch', 'full',
+                iverilog, vvp)
+    flushes = int_field(result_line(log), 'flushes')
+    traces = traces_of(log)
+    redirects = [l for l in traces if 'flush=11' in l]
+    taken = len(redirects)
+
+    # A redirect squashes BOTH wrong-path slots:
+    #   cycle +1 : IF/ID holds the flushed NOP (IFID=00000013)
+    #   cycle +2 : ID/EX holds the squashed NOP (IDEX=00000013)
+    # So each redirect must produce one of each -- 2 bubbles total.
+    ifid_nops, idex_nops = 0, 0
+    for i, l in enumerate(traces):
+        if 'flush=11' not in l:
+            continue
+        following = traces[i + 1:i + 3]
+        if any('IFID=00000013' in n for n in following):
+            ifid_nops += 1
+        if any('IDEX=00000013' in n for n in following):
+            idex_nops += 1
+    squashed = ifid_nops + idex_nops
+
+    # The far `jal x15, far_target` must actually be executed: x15 is
+    # its link address and x22 = x14 + 1 is computed after the jump.
+    ref_path = os.path.join(work, 'ex5', 'ref.trace')
+    link_ok = False
+    if os.path.exists(ref_path):
+        with open(ref_path) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 4 and parts[2] == '15':
+                    link_ok = True
+    print(f'  result: {result_line(log)}')
+    print(f'  taken redirects (flush=11 cycles): {taken}')
+    print(f'  flush counter: {flushes}')
+    print(f'  squashed NOP slots: IF/ID={ifid_nops}, ID/EX={idex_nops} '
+          f'(total {squashed}, expected {2 * taken})')
+    print(f'  far jal link register x15 retired: {link_ok}')
+    return [
+        ('flush counter == number of taken redirects (+1 each, NOT +2)',
+         taken > 0 and flushes == taken, ''),
+        ('each redirect squashes BOTH IF/ID and ID/EX (2 NOP slots)',
+         ifid_nops == taken and idex_nops == taken, ''),
+        ('the newly added far `jal` really executed', link_ok, ''),
+    ], (f'{taken} taken redirects, flushes={flushes}, '
+        f'{squashed} squashed NOP slots, far jal retired')
+
+
+# ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
 def main():

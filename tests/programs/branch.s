@@ -43,4 +43,23 @@ loop:
     jalr x0, x13, 0        # 返回到 after
 after:
     addi x14, x12, 100     # x14 = 103
+
+    # 练习 5（README §6.5）：跳到更远的目标，验证 taken 跳转同样会
+    # flush 两条错误路径指令。这里跳过整个 far_skip 块。
+    jal  x15, far_target
+far_skip:
+    addi x16, x0, 901      # 错误路径，应被 flush
+    addi x17, x0, 902      # 错误路径，应被 flush
+    addi x18, x0, 903
+    addi x19, x0, 904
+    addi x20, x0, 905
+    addi x21, x0, 906
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+far_target:
+    addi x22, x14, 1       # x22 = 104
     ecall

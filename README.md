@@ -128,6 +128,8 @@ tools/
   asm.py                简易 RV32I 汇编器（标签、.word、立即数）
   ref.py                单周期黄金参考解释器，生成 ref.trace/regs/data
   run_tests.py          构建并运行 7 × 4 矩阵，判定通过/预期失败
+  exercises.py          README §6 的 5 个动手实验，逐条核对断言
+  experiments/          实验 4 用的"改坏的 hazard_unit.v"（仅实验编译）
 tests/programs/*.s      7 个测试程序
 .github/workflows/ci.yml  三平台 CI
 docs/
@@ -192,7 +194,16 @@ gh run view <run-id> --log-failed       # 只看失败步骤
 2. 切到 `no_forward`，看 `x2` 从期望的 `2` 变成 `0`——这就是"寄存器堆里还是旧值"。
 3. 打开 `load_use_adj` 的 `no_hazard`，看 `x3` 变成 `0x4001` 而不是 `0x2b`——转发的是**地址**。
 4. 把 `rtl/hazard_unit.v` 里 `load_use_hazard` 的 `id_ex_mem_read` 条件去掉（或改成 `id_ex_reg_write`），重跑，看多停顿几拍但结果仍对不对、CPI 变成多少。
-5. 给 `branch.s` 加一条 `jal` 到更远的地方，数 `flushes` 计数是不是每次 taken 分支都 +2。
+5. 给 `branch.s` 加一条 `jal` 到更远的地方，看 `flushes` 是不是每次 taken 分支都 +1（`flush_if_id`/`flush_id_ex` 同时拉高的**那一拍**算一次），以及其后两拍的 `id_ex_instr` 是不是被清成 NOP。一个 taken 分支代价是 **2 条错误路径指令**，但计数器只 +1——这个区别很容易混淆。
+
+这 5 条都已经做成可复现的实验，全部由 `tools/exercises.py` 驱动，并在 CI 的三个 OS 上执行：
+
+```bash
+python -I tools/exercises.py          # 跑全部 5 条
+python -I tools/exercises.py 3        # 只跑第 3 条
+```
+
+它会重新汇编、编译、带 `+TRACE` 跑仿真，然后**逐条核对上面每个断言**（例如第 3 条要求真的看到 `0x4000` 出现在 ALU 输入端、第 4 条要求 CPI 确实变差、第 5 条要求每个 redirect 后面恰好有两个 NOP 槽）。第 4 条用的"改坏的 `hazard_unit.v`"放在 `tools/experiments/over_stall/`，只在实验里通过 `-I` 覆盖编译，**不会污染 `rtl/` 或正常测试矩阵**。
 
 **只有自己把控制信号改错过，才会真正理解"停顿"和"旁路"不是书本上的两个名词，而是流水线寄存器里控制信号的精确操作。**
 
