@@ -174,6 +174,31 @@ module cpu_tb;
     wire stall_now    = stall_out && !(flush_if_id || flush_id_ex);
     wire redirect_now = flush_if_id;
 
+    // ---- optional per-cycle pipeline trace (README 6 / howto 3) ----------
+    // Enable with `vvp sim.vvp +TRACE`. This makes the waveform exercises
+    // reproducible from a plain CI log: no gtkwave needed to see WHY a
+    // hazard is being forwarded, stalled or flushed.
+    reg trace_on = 0;
+    initial begin
+        if ($test$plusargs("TRACE")) trace_on = 1;
+    end
+
+    always @(posedge clk) begin
+        if (!reset && !finished && trace_on) begin
+            // Icarus 11 does not accept adjacent string literals here;
+            // use explicit concatenation so all three OS versions agree.
+            $display({"TRACE c=%0d pc=%h IFID=%h[%h] IDEX=%h EXMEM=%h MEMWB=%h ",
+                      "fwd=%b%b store=%b stall=%b lu=%b flush=%b%b ",
+                      "opA=%h opB=%h alu=%h memrd=%h wb=%h"},
+                     cycle, pc, if_id_instr, if_id_pc, id_ex_instr,
+                     ex_mem_instr, mem_wb_instr,
+                     dut.forward_a, dut.forward_b, dut.fwd_store,
+                     stall_now, load_use_hazard, flush_if_id, flush_id_ex,
+                     dut.operand_a_raw, dut.operand_b_raw,
+                     dut.alu_result, dut.mem_rdata, dut.wb_result);
+        end
+    end
+
     // ---- per-cycle statistics and per-retirement checking -----------------
     always @(posedge clk) begin
         if (!reset && !finished) begin
