@@ -135,6 +135,7 @@ tests/programs/*.s      7 个测试程序
 docs/
   pipeline.md           流水线寄存器字段与冒险判定条件
   howto.md              本地怎么跑、怎么看波形、怎么改参数
+  learning-guide.md     Verilog 是什么 / 国内外教材 / 自学路线 / 练手平台 / 产业应用
 ```
 
 ---
